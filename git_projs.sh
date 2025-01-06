@@ -7,6 +7,7 @@ python_projs=/d/mypython
 #repos root on local
 declare -A projs=( 
   ["demo_copilot"]=$java_projs
+  ["python_best"]=$python_projs
 )
 
 # assume upstream branch associated is "origin/master". Otherwise specify it in the following array
