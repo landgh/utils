@@ -11,7 +11,7 @@ add_config() {
 
 # Function to display usage
 show_usage() {
-    echo "Usage: $0 [system] [environment] [-h | -l | -o | -b]"
+    echo "Usage: $0 [-h | -l ] [system] [environment] -o | -b"
     echo "  system       - The target system (e.g., system1, system2)"
     echo "  environment  - The environment (e.g., prod, non-prod)"
     echo "  -o           - Use OAuth authentication"
@@ -43,10 +43,14 @@ elif [[ "$1" == "-l" ]]; then
     list_configs
 fi
 
-
 # Accept system, environment, and authentication method as arguments
-system=${1:-"system1"}  # Default to system1 if not provided
-env=${2:-"non-prod"}  # Default to non-prod if not provided
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Error: Both system and environment parameters are required."
+    show_usage
+    exit 1
+fi
+system=$1
+env=$2  # Default to non-prod if not provided
 auth_method=${3:-"-o"}  # Default to OAuth if not specified
 
 # Validate system and environment
@@ -56,11 +60,14 @@ if [ -z "${CONFIGS[$system,$env]}" ]; then
 fi
 
 # Load the selected configuration
-IFS=',' read -r APIGEE_ENDPOINT TOKEN_URL CLIENT_ID API_KEY TOKEN_FILE <<< "${CONFIGS[$system,$env]}"
+#IFS=',' read -r APIGEE_ENDPOINT TOKEN_URL CLIENT_ID API_KEY TOKEN_FILE <<< "${CONFIGS[$system,$env]}"
+IFS=',' read -r APIGEE_ENDPOINT TOKEN_URL CLIENT_ID API_KEY TOKEN_FILE <<< "$(echo "${CONFIGS[$system,$env]}" | sed 's/, */,/g')"
+
 
 # Handle authentication method
 if [[ "$auth_method" == "-o" ]]; then
-    echo -n "Enter client secret: "
+    echo -e "Connecting to $system in $env environment using OAuth...\n"
+    echo -n "Enter $CLIENT_ID client secret: "
     stty -echo
     read CLIENT_SECRET
     stty echo
@@ -101,14 +108,13 @@ if [[ "$auth_method" == "-o" ]]; then
     AUTH_HEADER="Authorization: Bearer $ACCESS_TOKEN"
 
 elif [[ "$auth_method" == "-b" ]]; then
-    echo -n "Enter username: "
-    read USERNAME
-    echo -n "Enter password: "
+    echo -e "Connecting to $system in $env environment using basic auth...\n"
+    echo -n "Enter $CLIENT_ID password: "
     stty -echo
     read PASSWORD
     stty echo
     echo ""
-    AUTH_HEADER="Authorization: Basic $(echo -n "$USERNAME:$PASSWORD" | base64)"
+    AUTH_HEADER="Authorization: Basic $(echo -n "$CLIENT_ID:$PASSWORD" | base64)"
 else
     echo "Invalid authentication method. Use -o for OAuth or -b for Basic Auth."
     exit 1
