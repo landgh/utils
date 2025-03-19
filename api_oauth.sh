@@ -11,15 +11,17 @@ add_config() {
 
 # Function to display usage
 show_usage() {
-    echo "Usage: $0 [system] [environment]"
+    echo "Usage: $0 [system] [environment] [-h | -l | -o | -b]"
     echo "  system       - The target system (e.g., system1, system2)"
     echo "  environment  - The environment (e.g., prod, non-prod)"
+    echo "  -o           - Use OAuth authentication"
+    echo "  -b           - Use Basic authentication"
     echo "  -h           - Show this help message"
     echo "  -l           - List all available configurations with details"
     exit 0
 }
 
-# Function to list all configurations with details
+# Function to list all configurations with details, sorted by system and env
 list_configs() {
     echo "Available Configurations:"
     for key in "${!CONFIGS[@]}"; do
@@ -41,9 +43,11 @@ elif [[ "$1" == "-l" ]]; then
     list_configs
 fi
 
-# Accept system and environment as arguments
+
+# Accept system, environment, and authentication method as arguments
 system=${1:-"system1"}  # Default to system1 if not provided
 env=${2:-"non-prod"}  # Default to non-prod if not provided
+auth_method=${3:-"-o"}  # Default to OAuth if not specified
 
 # Validate system and environment
 if [ -z "${CONFIGS[$system,$env]}" ]; then
@@ -51,57 +55,68 @@ if [ -z "${CONFIGS[$system,$env]}" ]; then
     exit 1
 fi
 
-# Prompt user for client secret (hidden input)
-echo -n "Enter client secret: "
-stty -echo
-read CLIENT_SECRET
-stty echo
-echo ""
-
 # Load the selected configuration
 IFS=',' read -r APIGEE_ENDPOINT TOKEN_URL CLIENT_ID API_KEY TOKEN_FILE <<< "${CONFIGS[$system,$env]}"
 
-GRANT_TYPE="client_credentials"
+# Handle authentication method
+if [[ "$auth_method" == "-o" ]]; then
+    echo -n "Enter client secret: "
+    stty -echo
+    read CLIENT_SECRET
+    stty echo
+    echo ""
+    
+    get_new_token() {
+        echo "Fetching new token for $system in $env environment..."
+        response=$(curl -s -X POST "$TOKEN_URL" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "grant_type=client_credentials&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET")
+        
+        ACCESS_TOKEN=$(echo "$response" | jq -r .access_token)
+        EXPIRES_IN=$(echo "$response" | jq -r .expires_in)
+        
+        if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
+            echo "Failed to get access token. Response: $response"
+            exit 1
+        fi
+        
+        EXPIRY_TIME=$(( $(date +%s) + $EXPIRES_IN ))
+        echo "$ACCESS_TOKEN $EXPIRY_TIME" > "$TOKEN_FILE"
+        echo "New token acquired for $system in $env."
+    }
 
-# Function to fetch a new token
-get_new_token() {
-    echo "Fetching new token for $system in $env environment..."
-    response=$(curl -s -X POST "$TOKEN_URL" \
-        -H "Content-Type: application/x-www-form-urlencoded" \
-        -d "grant_type=$GRANT_TYPE&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET")
-    
-    ACCESS_TOKEN=$(echo "$response" | jq -r .access_token)
-    EXPIRES_IN=$(echo "$response" | jq -r .expires_in)
-    
-    if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
-        echo "Failed to get access token. Response: $response"
-        exit 1
-    fi
-    
-    EXPIRY_TIME=$(( $(date +%s) + $EXPIRES_IN ))
-    echo "$ACCESS_TOKEN $EXPIRY_TIME" > "$TOKEN_FILE"
-    echo "New token acquired for $system in $env."
-}
-
-# Function to read the existing token
-get_stored_token() {
-    if [ -f "$TOKEN_FILE" ]; then
-        read ACCESS_TOKEN EXPIRY_TIME < "$TOKEN_FILE"
-        CURRENT_TIME=$(date +%s)
-        if [ "$CURRENT_TIME" -ge "$EXPIRY_TIME" ]; then
+    get_stored_token() {
+        if [ -f "$TOKEN_FILE" ]; then
+            read ACCESS_TOKEN EXPIRY_TIME < "$TOKEN_FILE"
+            CURRENT_TIME=$(date +%s)
+            if [ "$CURRENT_TIME" -ge "$EXPIRY_TIME" ]; then
+                get_new_token
+            fi
+        else
             get_new_token
         fi
-    else
-        get_new_token
-    fi
-}
+    }
 
-# Get a valid token
-get_stored_token
+    get_stored_token
+    AUTH_HEADER="Authorization: Bearer $ACCESS_TOKEN"
+
+elif [[ "$auth_method" == "-b" ]]; then
+    echo -n "Enter username: "
+    read USERNAME
+    echo -n "Enter password: "
+    stty -echo
+    read PASSWORD
+    stty echo
+    echo ""
+    AUTH_HEADER="Authorization: Basic $(echo -n "$USERNAME:$PASSWORD" | base64)"
+else
+    echo "Invalid authentication method. Use -o for OAuth or -b for Basic Auth."
+    exit 1
+fi
 
 # Make API request
 response=$(curl -s -X GET "$APIGEE_ENDPOINT" \
-    -H "Authorization: Bearer $ACCESS_TOKEN" \
+    -H "$AUTH_HEADER" \
     -H "x-api-key: $API_KEY")
 
 # Output response
