@@ -5,20 +5,47 @@ declare -A CONFIGS
 
 # Function to add configurations
 add_config() {
-    local system=$1 env=$2 endpoint=$3 token_url=$4 client_id=$5 client_secret=$6 api_key=$7 token_file=$8
+    local system=$1 env=$2 endpoint=$3 token_url=$4 client_id=$5 api_key=$6 token_file=$7
     CONFIGS[$system,$env,APIGEE_ENDPOINT]="$endpoint"
     CONFIGS[$system,$env,TOKEN_URL]="$token_url"
     CONFIGS[$system,$env,CLIENT_ID]="$client_id"
-    CONFIGS[$system,$env,CLIENT_SECRET]="$client_secret"
     CONFIGS[$system,$env,API_KEY]="$api_key"
     CONFIGS[$system,$env,TOKEN_FILE]="$token_file"
 }
 
+# Function to display usage
+show_usage() {
+    echo "Usage: $0 [system] [environment]"
+    echo "  system       - The target system (e.g., system1, system2)"
+    echo "  environment  - The environment (e.g., prod, non-prod)"
+    echo "  -h           - Show this help message"
+    echo "  -l           - List all available configurations with details"
+    exit 0
+}
+
+# Function to list all configurations with details
+list_configs() {
+    echo "Available Configurations:"
+    for key in "${!CONFIGS[@]}"; do
+        IFS=',' read -r system env field <<< "$key"
+        echo "System: $system, Environment: $env, $field: ${CONFIGS[$key]}"
+    done
+    exit 0
+}
+
 # Initialize configurations
-add_config "system1" "prod" "https://api.prod.system1.com/resource" "https://login.prod.system1.com/oauth/token" "your_prod_system1_client_id" "your_prod_system1_client_secret" "your_prod_system1_api_key" "token_system1_prod.txt"
-add_config "system1" "non-prod" "https://api.nonprod.system1.com/resource" "https://login.nonprod.system1.com/oauth/token" "your_nonprod_system1_client_id" "your_nonprod_system1_client_secret" "your_nonprod_system1_api_key" "token_system1_nonprod.txt"
-add_config "system2" "prod" "https://api.prod.system2.com/resource" "https://login.prod.system2.com/oauth/token" "your_prod_system2_client_id" "your_prod_system2_client_secret" "your_prod_system2_api_key" "token_system2_prod.txt"
-add_config "system2" "non-prod" "https://api.nonprod.system2.com/resource" "https://login.nonprod.system2.com/oauth/token" "your_nonprod_system2_client_id" "your_nonprod_system2_client_secret" "your_nonprod_system2_api_key" "token_system2_nonprod.txt"
+add_config "system1" "prod" "https://api.prod.system1.com/resource" "https://login.prod.system1.com/oauth/token" "your_prod_system1_client_id" "your_prod_system1_api_key" "token_system1_prod.txt"
+add_config "system1" "non-prod" "https://api.nonprod.system1.com/resource" "https://login.nonprod.system1.com/oauth/token" "your_nonprod_system1_client_id" "your_nonprod_system1_api_key" "token_system1_nonprod.txt"
+add_config "system2" "prod" "https://api.prod.system2.com/resource" "https://login.prod.system2.com/oauth/token" "your_prod_system2_client_id" "your_prod_system2_api_key" "token_system2_prod.txt"
+add_config "system2" "non-prod" "https://api.nonprod.system2.com/resource" "https://login.nonprod.system2.com/oauth/token" "your_nonprod_system2_client_id" "your_nonprod_system2_api_key" "token_system2_nonprod.txt"
+
+# Check for help or list flag
+if [[ "$1" == "-h" ]]; then
+    show_usage
+elif [[ "$1" == "-l" ]]; then
+    list_configs
+fi
+
 
 # Accept system and environment as arguments
 system=${1:-"system1"}  # Default to system1 if not provided
@@ -30,11 +57,17 @@ if [ -z "${CONFIGS[$system,$env,APIGEE_ENDPOINT]}" ]; then
     exit 1
 fi
 
+# Prompt user for client secret (hidden input)
+echo -n "Enter client secret: "
+stty -echo
+read CLIENT_SECRET
+stty echo
+echo ""
+
 # Load the selected configuration
 APIGEE_ENDPOINT="${CONFIGS[$system,$env,APIGEE_ENDPOINT]}"
 TOKEN_URL="${CONFIGS[$system,$env,TOKEN_URL]}"
 CLIENT_ID="${CONFIGS[$system,$env,CLIENT_ID]}"
-CLIENT_SECRET="${CONFIGS[$system,$env,CLIENT_SECRET]}"
 API_KEY="${CONFIGS[$system,$env,API_KEY]}"
 TOKEN_FILE="${CONFIGS[$system,$env,TOKEN_FILE]}"
 
