@@ -1,98 +1,110 @@
 #!/bin/sh
 
+# Color codes for output
 Color_Off='\033[0m'       # Text Reset
 Red='\033[0;31m'          # Red
 BGreen='\033[1;32m'       # Green
 
-display() {
+# Display usage information
+display_usage() {
     echo "Usage: . git_refresh.sh -h|-l [proj]|r [proj]|-s [proj]"
-    for p in ${!projs[@]}; do
-        echo -e "  $BGreen${projs[$p]}/$p:$Red ${branches[$p]=master}$Color_Off"
+    for p in "${!projs[@]}"; do
+        echo -e "  $BGreen${projs[$p]}/$p:$Red ${branches[$p]:-master}$Color_Off"
     done | sort
-
     exit 0
 }
 
-refresh() {
-    echo "refreshing git repos with $@"
-    for p in ${!projs[@]}; do
+# Refresh git repositories
+refresh_repos() {
+    echo "Refreshing git repos with $@"
+    for p in "${!projs[@]}"; do
         dir=${projs[$p]}
-        branch=${branches[$p]=master}
+        branch=${branches[$p]:-$(git remote show origin | grep 'HEAD branch' | awk '{print $NF}')}
         ok=0
-        if [ "$param" -a "$param" = "$p" ]; then
+
+        if [ "$param" ] && [ "$param" = "$p" ]; then
             ok=1
         elif [ "$param" ]; then
             continue
         fi
 
-        if [ $action = "pull" ]; then
-            pull $dir $p $branch $param
-        elif [ $action = "log" ]; then
-            #echo "getting log $dir $p $branch $param ........"
-            log $dir $p $branch $param
-        elif [ $action = "status" ]; then
-            #echo "getting status $dir $p $branch $param ........"
-            status $dir $p $branch $param
-        fi
-        
-        if [ $ok -eq 1 ]; then
-            break
-        fi
+        case $action in
+            pull)
+                pull_repo "$dir" "$p" "$branch" "$param"
+                ;;
+            log)
+                log_repo "$dir" "$p" "$branch" "$param"
+                ;;
+            status)
+                status_repo "$dir" "$p" "$branch" "$param"
+                ;;
+            *)
+                echo "Unknown action: $action"
+                ;;
+        esac
     done
 }
 
-pull() {
-    path=$1
-    p=$2
-    branch=$3
-    echo -e "\n$BGreen================== git pull $path/$p $branch==================$Color_Off"
-    git checkout $branch
+# Pull repository
+pull_repo() {
+    local dir=$1
+    local proj=$2
+    local branch=$3
+    local param=$4
+    echo -e "\n$BGreen================== git pull $dir/$proj $branch ===================$Color_Off"
+    cd $dir/$proj
     
-    cd $path/$p
     git fetch -p origin
 
-    if git show-ref --quite refs/heads/$branch-new; then
+    if git show-ref --quiet refs/heads/$branch-new; then
+        # echo "Deleting existing branch $branch-new"
+        git checkout --detach
         git branch -D $branch-new
     fi
 
-    git checkout -b $branch-new origin
+    echo "Creating new branch $branch-new"
+    git checkout -b $branch-new
+
     git branch -D $branch
     git branch -m $branch
     git gc
 }
 
-log () {
-    path=$1
-    p=$2
-    branch=$3
-    echo -e "\n$BGreen================== git log $path/$p $branch|head -20==================$Color_Off"
-    cd $path/$p
-    echo "`pwd` git log $p $branch|head -20"
+# Log repository
+log_repo() {
+    local dir=$1
+    local proj=$2
+    local branch=$3
+    local param=$4
+    echo -e "\n$BGreen================== git log $dir/$proj $branch|head -20==================$Color_Off"
+    cd $dir/$proj
+    echo "`pwd` git log $proj $branch|head -20"
     git log --oneline --graph --decorate --all
 }
 
-status() {
-    path=$1
-    p=$2
-    branch=$3
+# Status repository
+status_repo() {
+    local dir=$1
+    local proj=$2
+    local branch=$3
+    local param=$4
 
-    cd $path/$p
+    cd $dir/$proj
     git fetch origin
     status_msg=$(git status)
     discarded=$(echo $status_msg | grep "nothing to commit, working tree clean")
     no_commit=$?
     
-    discarded=$(echo $status_msg | grep "Your branch is up to date with 'origin/$3'")
+    discarded=$(echo $status_msg | grep "Your branch is up to date with 'origin/$branch'")
     upto_dt=$?
     
     if [ $no_commit -eq 0 -a $upto_dt -eq 0 ]; then
-        echo -e "\n$BGreen================== git status $path/$p $branch==================$Color_Off"
+        echo -e "\n$BGreen================== git status $dir/$proj $branch==================$Color_Off"
         echo "Working tree clean"
     else
-        echo -e "\n$Red================== git status $path/$p $branch==================$Color_Off"
+        echo -e "\n$Red================== git status $dir/$proj $branch==================$Color_Off"
     fi
     git status
-    #echo -e "\n$$Color_Off"
 }
 
 # source git_projs.sh
@@ -101,13 +113,13 @@ curr=`pwd`
 param=''
 
 if [ $# -lt 1 ]; then
-    display
+    display_usage
 fi
 
 while getopts ":hlsr" opt; do
     case $opt in
         h)
-            display
+            display_usage
             ;;
         l)
             shift && action="log" && param=$1
@@ -120,13 +132,13 @@ while getopts ":hlsr" opt; do
             ;;
         \?)
             echo "Invalid option: -$OPTARG" >&2
-            display
+            display_usage
             ;;
     esac
 done
 
 shift $((OPTIND - 1))
-refresh
+refresh_repos
 cd $curr
 
 echo -e "\n$BGreen================== git_util.sh done ==================$Color_Off"
