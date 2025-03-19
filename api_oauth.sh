@@ -6,11 +6,7 @@ declare -A CONFIGS
 # Function to add configurations
 add_config() {
     local system=$1 env=$2 endpoint=$3 token_url=$4 client_id=$5 api_key=$6 token_file=$7
-    CONFIGS[$system,$env,APIGEE_ENDPOINT]="$endpoint"
-    CONFIGS[$system,$env,TOKEN_URL]="$token_url"
-    CONFIGS[$system,$env,CLIENT_ID]="$client_id"
-    CONFIGS[$system,$env,API_KEY]="$api_key"
-    CONFIGS[$system,$env,TOKEN_FILE]="$token_file"
+    CONFIGS[$system,$env]="$endpoint, $token_url, $client_id, $api_key, $token_file"
 }
 
 # Function to display usage
@@ -27,9 +23,8 @@ show_usage() {
 list_configs() {
     echo "Available Configurations:"
     for key in "${!CONFIGS[@]}"; do
-        IFS=',' read -r system env field <<< "$key"
-        echo "System: $system, Environment: $env, $field: ${CONFIGS[$key]}"
-    done
+        echo "$key|${CONFIGS[$key]}"
+    done | sort | awk -F '|' '{printf "%s\n\t%s\n", $1, $2}'
     exit 0
 }
 
@@ -46,13 +41,12 @@ elif [[ "$1" == "-l" ]]; then
     list_configs
 fi
 
-
 # Accept system and environment as arguments
 system=${1:-"system1"}  # Default to system1 if not provided
 env=${2:-"non-prod"}  # Default to non-prod if not provided
 
 # Validate system and environment
-if [ -z "${CONFIGS[$system,$env,APIGEE_ENDPOINT]}" ]; then
+if [ -z "${CONFIGS[$system,$env]}" ]; then
     echo "Invalid system or environment: $system, $env"
     exit 1
 fi
@@ -65,11 +59,7 @@ stty echo
 echo ""
 
 # Load the selected configuration
-APIGEE_ENDPOINT="${CONFIGS[$system,$env,APIGEE_ENDPOINT]}"
-TOKEN_URL="${CONFIGS[$system,$env,TOKEN_URL]}"
-CLIENT_ID="${CONFIGS[$system,$env,CLIENT_ID]}"
-API_KEY="${CONFIGS[$system,$env,API_KEY]}"
-TOKEN_FILE="${CONFIGS[$system,$env,TOKEN_FILE]}"
+IFS=',' read -r APIGEE_ENDPOINT TOKEN_URL CLIENT_ID API_KEY TOKEN_FILE <<< "${CONFIGS[$system,$env]}"
 
 GRANT_TYPE="client_credentials"
 
