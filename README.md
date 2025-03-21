@@ -134,6 +134,22 @@ response=$(curl -s -X GET "$APIGEE_ENDPOINT" \
 # Output response
 echo "Response: $response"
 
+# Detect and display token version if applicable
+# Extract and show token claims if it's a JWT token
+if [[ -n "$ACCESS_TOKEN" ]]; then
+    if echo "$ACCESS_TOKEN" | grep -q '\.'; then
+        # JWT token - likely v2
+        HEADER=$(echo "$ACCESS_TOKEN" | cut -d '.' -f1 | base64 --decode 2>/dev/null)
+        if echo "$HEADER" | grep -q 'alg'; then
+            echo "Detected OAuth2 v2 token (JWT format)"
+        else
+            echo "Token format could not be identified"
+        fi
+    else
+        echo "Detected OAuth2 v1 token (opaque format)"
+    fi
+fi
+
 ```
 --- git_projs.sh
 ```
