@@ -10,7 +10,8 @@ declare -A projs=(
   ["python_best"]=$python_projs
 )
 
-# assume upstream branch associated is "origin/master". Otherwise specify it in the following array
-#declare -A branches=( 
-#  ["demo_copilot"]="master"
-#)
+# support multiple branches for each project
+declare -A branches=( 
+  ["demo_copilot"]="master feature1 feature2"
+  ["python_best"]="master feature"
+)

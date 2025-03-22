@@ -19,29 +19,37 @@ refresh_repos() {
     echo "Refreshing git repos with $@"
     for p in "${!projs[@]}"; do
         dir=${projs[$p]}
-        branch=${branches[$p]:-$(git remote show origin | grep 'HEAD branch' | awk '{print $NF}')}
-        ok=0
 
-        if [ "$param" ] && [ "$param" = "$p" ]; then
-            ok=1
-        elif [ "$param" ]; then
-            continue
-        fi
+        branch_list=${branches[$p]}
+        for branch in $branch_list; do
 
-        case $action in
-            pull)
-                pull_repo "$dir" "$p" "$branch" "$param"
-                ;;
-            log)
-                log_repo "$dir" "$p" "$branch" "$param"
-                ;;
-            status)
-                status_repo "$dir" "$p" "$branch" "$param"
-                ;;
-            *)
-                echo "Unknown action: $action"
-                ;;
-        esac
+            echo "processing $dir/$p $branch"
+            #continue
+
+            branch=${branches[$p]:-$(git remote show origin | grep 'HEAD branch' | awk '{print $NF}')}
+            ok=0
+
+            if [ "$param" ] && [ "$param" = "$p" ]; then
+                ok=1
+            elif [ "$param" ]; then
+                continue
+            fi
+
+            case $action in
+                pull)
+                    pull_repo "$dir" "$p" "$branch" "$param"
+                    ;;
+                log)
+                    log_repo "$dir" "$p" "$branch" "$param"
+                    ;;
+                status)
+                    status_repo "$dir" "$p" "$branch" "$param"
+                    ;;
+                *)
+                    echo "Unknown action: $action"
+                    ;;
+            esac
+        done
     done
 }
 
