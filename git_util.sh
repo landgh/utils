@@ -26,7 +26,7 @@ refresh_repos() {
             echo "processing $dir/$p $branch"
             #continue
 
-            branch=${branches[$p]:-$(git remote show origin | grep 'HEAD branch' | awk '{print $NF}')}
+            #branch=${branches[$p]:-$(git remote show origin | grep 'HEAD branch' | awk '{print $NF}')}
             ok=0
 
             if [ "$param" ] && [ "$param" = "$p" ]; then
@@ -37,13 +37,13 @@ refresh_repos() {
 
             case $action in
                 pull)
-                    pull_repo "$dir" "$p" "$branch" "$param"
+                    echo "pull_repo $dir $p $branch $param"
                     ;;
                 log)
-                    log_repo "$dir" "$p" "$branch" "$param"
+                    echo "log_repo $dir $p $branch $param"
                     ;;
                 status)
-                    status_repo "$dir" "$p" "$branch" "$param"
+                    echo "status_repo $dir $p $branch $param"
                     ;;
                 *)
                     echo "Unknown action: $action"
